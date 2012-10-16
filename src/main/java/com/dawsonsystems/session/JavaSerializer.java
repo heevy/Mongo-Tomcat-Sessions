@@ -20,11 +20,18 @@
 
 package com.dawsonsystems.session;
 
-import org.apache.catalina.session.StandardSession;
-import org.apache.catalina.util.CustomObjectInputStream;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
 import javax.servlet.http.HttpSession;
-import java.io.*;
+
+import org.apache.catalina.session.StandardSession;
+import org.apache.catalina.util.CustomObjectInputStream;
 
 
 public class JavaSerializer implements Serializer {

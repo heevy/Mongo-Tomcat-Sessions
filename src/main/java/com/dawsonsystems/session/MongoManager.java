@@ -20,10 +20,6 @@
 
 package com.dawsonsystems.session;
 
-import com.mongodb.*;
-import org.apache.catalina.*;
-import org.apache.catalina.session.StandardSession;
-
 import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,6 +28,27 @@ import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import org.apache.catalina.Container;
+import org.apache.catalina.Lifecycle;
+import org.apache.catalina.LifecycleException;
+import org.apache.catalina.LifecycleListener;
+import org.apache.catalina.LifecycleState;
+import org.apache.catalina.Loader;
+import org.apache.catalina.Manager;
+import org.apache.catalina.Session;
+import org.apache.catalina.Valve;
+import org.apache.catalina.session.StandardSession;
+
+import com.mongodb.BasicDBObject;
+import com.mongodb.DB;
+import com.mongodb.DBCollection;
+import com.mongodb.DBCursor;
+import com.mongodb.DBObject;
+import com.mongodb.Mongo;
+import com.mongodb.ReadPreference;
+import com.mongodb.ServerAddress;
+import com.mongodb.WriteResult;
 
 public class MongoManager implements Manager, Lifecycle {
   private static Logger log = Logger.getLogger("MongoManager");
@@ -45,9 +62,6 @@ public class MongoManager implements Manager, Lifecycle {
   private MongoSessionTrackerValve trackerValve;
   private ThreadLocal<StandardSession> currentSession = new ThreadLocal<StandardSession>();
   private Serializer serializer;
-
-  //Either 'kryo' or 'java'
-  private String serializationStrategyClass = "com.dawsonsystems.session.JavaSerializer";
 
   private Container container;
   private int maxInactiveInterval;
@@ -98,12 +112,12 @@ public class MongoManager implements Manager, Lifecycle {
   }
 
   @Override
-  public int getSessionCounter() {
+  public long getSessionCounter() {
     return 10000000;
   }
 
   @Override
-  public void setSessionCounter(int i) {
+  public void setSessionCounter(long i) {
 
   }
 
@@ -123,21 +137,17 @@ public class MongoManager implements Manager, Lifecycle {
   }
 
   @Override
-  public int getExpiredSessions() {
+  public long getExpiredSessions() {
     return 0;
   }
 
   @Override
-  public void setExpiredSessions(int i) {
+  public void setExpiredSessions(long i) {
 
   }
 
   public int getRejectedSessions() {
     return 0;
-  }
-
-  public void setSerializationStrategyClass(String strategy) {
-    this.serializationStrategyClass = strategy;
   }
 
   public void setSlaveOk(boolean slaveOk) {
@@ -164,11 +174,6 @@ public class MongoManager implements Manager, Lifecycle {
   @Override
   public int getSessionAverageAliveTime() {
     return 0;
-  }
-
-  @Override
-  public void setSessionAverageAliveTime(int i) {
-
   }
 
   public void load() throws ClassNotFoundException, IOException {
@@ -268,18 +273,7 @@ public class MongoManager implements Manager, Lifecycle {
         break;
       }
     }
-    try {
-      initSerializer();
-    } catch (ClassNotFoundException e) {
-      log.log(Level.SEVERE, "Unable to load serializer", e);
-      throw new LifecycleException(e);
-    } catch (InstantiationException e) {
-      log.log(Level.SEVERE, "Unable to load serializer", e);
-      throw new LifecycleException(e);
-    } catch (IllegalAccessException e) {
-      log.log(Level.SEVERE, "Unable to load serializer", e);
-      throw new LifecycleException(e);
-    }
+    initSerializer();
     log.info("Will expire sessions after " + getMaxInactiveInterval() + " seconds");
     initDbConnection();
   }
@@ -440,6 +434,10 @@ public class MongoManager implements Manager, Lifecycle {
       log.fine("Session removed from ThreadLocal :" + session.getIdInternal());
     }
   }
+  
+  public void remove(Session session, boolean update) {
+	  remove(session);
+  }
 
   public void remove(Session session) {
     log.fine("Removing session ID : " + session.getId());
@@ -489,19 +487,17 @@ public class MongoManager implements Manager, Lifecycle {
       mongo = new Mongo(addrs);
       db = mongo.getDB(getDatabase());
       if (slaveOk) {
-        db.slaveOk();
+        db.setReadPreference(ReadPreference.secondaryPreferred());
       }
       getCollection().ensureIndex(new BasicDBObject("lastmodified", 1));
       log.info("Connected to Mongo " + host + "/" + database + " for session storage, slaveOk=" + slaveOk + ", " + (getMaxInactiveInterval() * 1000) + " session live time");
     } catch (IOException e) {
-      e.printStackTrace();
       throw new LifecycleException("Error Connecting to Mongo", e);
     }
   }
 
-  private void initSerializer() throws ClassNotFoundException, IllegalAccessException, InstantiationException {
-    log.info("Attempting to use serializer :" + serializationStrategyClass);
-    serializer = (Serializer) Class.forName(serializationStrategyClass).newInstance();
+  private void initSerializer() throws LifecycleException {
+    serializer = new JavaSerializer();
 
     Loader loader = null;
 
@@ -515,4 +511,38 @@ public class MongoManager implements Manager, Lifecycle {
     }
     serializer.setClassLoader(classLoader);
   }
+
+  @Override
+  public int getSessionCreateRate() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public int getSessionExpireRate() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public void init() throws LifecycleException {
+  }
+
+  @Override
+  public void destroy() throws LifecycleException {
+    // TODO Auto-generated method stub
+  }
+
+  @Override
+  public LifecycleState getState() {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+  @Override
+  public String getStateName() {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
 }

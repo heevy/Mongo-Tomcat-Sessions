@@ -23,10 +23,7 @@ package com.dawsonsystems.session;
 import org.apache.catalina.Manager;
 import org.apache.catalina.session.StandardSession;
 
-import java.util.logging.Logger;
-
 public class MongoSession extends StandardSession {
-  private static Logger log = Logger.getLogger("MongoManager");
   private boolean isValid = true;
 
   public MongoSession(Manager manager) {
