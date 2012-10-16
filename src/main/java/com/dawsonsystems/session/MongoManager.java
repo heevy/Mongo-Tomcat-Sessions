@@ -30,7 +30,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.catalina.Container;
-import org.apache.catalina.Lifecycle;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleListener;
 import org.apache.catalina.LifecycleState;
@@ -39,6 +38,7 @@ import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
 import org.apache.catalina.Valve;
 import org.apache.catalina.session.StandardSession;
+import org.apache.catalina.util.LifecycleBase;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
@@ -50,7 +50,7 @@ import com.mongodb.ReadPreference;
 import com.mongodb.ServerAddress;
 import com.mongodb.WriteResult;
 
-public class MongoManager implements Manager, Lifecycle {
+public class MongoManager extends LifecycleBase implements Manager {
   private static Logger log = Logger.getLogger("MongoManager");
   protected static String host = "localhost";
   protected static int port = 27017;
@@ -65,7 +65,7 @@ public class MongoManager implements Manager, Lifecycle {
 
   private Container container;
   private int maxInactiveInterval;
-
+  
   @Override
   public Container getContainer() {
     return container;
@@ -176,9 +176,11 @@ public class MongoManager implements Manager, Lifecycle {
     return 0;
   }
 
+  @Override
   public void load() throws ClassNotFoundException, IOException {
   }
 
+  @Override
   public void unload() throws IOException {
   }
 
@@ -187,13 +189,16 @@ public class MongoManager implements Manager, Lifecycle {
     processExpires();
   }
 
+  @Override
   public void addLifecycleListener(LifecycleListener lifecycleListener) {
   }
 
+  @Override
   public LifecycleListener[] findLifecycleListeners() {
     return new LifecycleListener[0];  //To change body of implemented methods use File | Settings | File Templates.
   }
 
+  @Override
   public void removeLifecycleListener(LifecycleListener lifecycleListener) {
   }
 
@@ -229,14 +234,8 @@ public class MongoManager implements Manager, Lifecycle {
     return session;
   }
 
-  /**
-   * @deprecated
-   */
-  public org.apache.catalina.Session createSession() {
-    return createEmptySession();
-  }
-
-  public org.apache.catalina.Session createSession(java.lang.String sessionId) {
+  @Override
+  public org.apache.catalina.Session createSession(String sessionId) {
     StandardSession session = (MongoSession) createEmptySession();
 
     log.fine("Created session with id " + session.getIdInternal() + " ( " + sessionId + ")");
@@ -247,7 +246,8 @@ public class MongoManager implements Manager, Lifecycle {
     return session;
   }
 
-  public org.apache.catalina.Session[] findSessions() {
+  @Override
+  public Session[] findSessions() {
     try {
       List<Session> sessions = new ArrayList<Session>();
       for(String sessionId : keys()) {
@@ -259,29 +259,7 @@ public class MongoManager implements Manager, Lifecycle {
     }
   }
 
-  protected org.apache.catalina.session.StandardSession getNewSession() {
-    log.fine("getNewSession()");
-    return (MongoSession) createEmptySession();
-  }
-
-  public void start() throws LifecycleException {
-    for (Valve valve : getContainer().getPipeline().getValves()) {
-      if (valve instanceof MongoSessionTrackerValve) {
-        trackerValve = (MongoSessionTrackerValve) valve;
-        trackerValve.setMongoManager(this);
-        log.info("Attached to Mongo Tracker Valve");
-        break;
-      }
-    }
-    initSerializer();
-    log.info("Will expire sessions after " + getMaxInactiveInterval() + " seconds");
-    initDbConnection();
-  }
-
-  public void stop() throws LifecycleException {
-    mongo.close();
-  }
-
+  @Override
   public Session findSession(String id) throws IOException {
     return loadSession(id);
   }
@@ -310,20 +288,11 @@ public class MongoManager implements Manager, Lifecycle {
     MongoManager.database = database;
   }
 
-  public void clear() throws IOException {
-    getCollection().drop();
-    getCollection().ensureIndex(new BasicDBObject("lastmodified", 1));
-  }
-
   private DBCollection getCollection() throws IOException {
     return db.getCollection("sessions");
   }
 
-  public int getSize() throws IOException {
-    return (int) getCollection().count();
-  }
-
-  public String[] keys() throws IOException {
+  private String[] keys() throws IOException {
 
     BasicDBObject restrict = new BasicDBObject();
     restrict.put("_id", 1);
@@ -339,8 +308,7 @@ public class MongoManager implements Manager, Lifecycle {
     return ret.toArray(new String[ret.size()]);
   }
 
-
-  public Session loadSession(String id) throws IOException {
+  private Session loadSession(String id) throws IOException {
 
     if (id == null || id.length() == 0) {
       return createEmptySession();
@@ -364,7 +332,7 @@ public class MongoManager implements Manager, Lifecycle {
 
       if (dbsession == null) {
         log.fine("Session " + id + " not found in Mongo");
-        StandardSession ret = getNewSession();
+        StandardSession ret = (StandardSession) createEmptySession();
         ret.setId(id);
         currentSession.set(ret);
         return ret;
@@ -427,7 +395,6 @@ public class MongoManager implements Manager, Lifecycle {
       log.fine("Updated session with id " + session.getIdInternal());
     } catch (IOException e) {
       log.severe(e.getMessage());
-      e.printStackTrace();
       throw e;
     } finally {
       currentSession.remove();
@@ -435,10 +402,12 @@ public class MongoManager implements Manager, Lifecycle {
     }
   }
   
+  @Override
   public void remove(Session session, boolean update) {
 	  remove(session);
   }
 
+  @Override
   public void remove(Session session) {
     log.fine("Removing session ID : " + session.getId());
     BasicDBObject query = new BasicDBObject();
@@ -455,10 +424,9 @@ public class MongoManager implements Manager, Lifecycle {
 
   @Override
   public void removePropertyChangeListener(PropertyChangeListener propertyChangeListener) {
-    //To change body of implemented methods use File | Settings | File Templates.
   }
 
-  public void processExpires() {
+  private void processExpires() {
     BasicDBObject query = new BasicDBObject();
 
     long olderThan = System.currentTimeMillis() - (getMaxInactiveInterval() * 1000);
@@ -525,24 +493,33 @@ public class MongoManager implements Manager, Lifecycle {
   }
 
   @Override
-  public void init() throws LifecycleException {
+  protected void initInternal() throws LifecycleException {
   }
 
   @Override
-  public void destroy() throws LifecycleException {
-    // TODO Auto-generated method stub
+  protected void startInternal() throws LifecycleException {
+    setState(LifecycleState.STARTING);
+    for (Valve valve : getContainer().getPipeline().getValves()) {
+      if (valve instanceof MongoSessionTrackerValve) {
+        trackerValve = (MongoSessionTrackerValve) valve;
+        trackerValve.setMongoManager(this);
+        log.info("Attached to Mongo Tracker Valve");
+        break;
+      }
+    }
+    initSerializer();
+    log.info("Will expire sessions after " + getMaxInactiveInterval() + " seconds");
+    initDbConnection();
   }
 
   @Override
-  public LifecycleState getState() {
-    // TODO Auto-generated method stub
-    return null;
+  protected void stopInternal() throws LifecycleException {
+    setState(LifecycleState.STOPPING);
   }
 
   @Override
-  public String getStateName() {
-    // TODO Auto-generated method stub
-    return null;
+  protected void destroyInternal() throws LifecycleException {
+    mongo.close();
   }
 
 }
