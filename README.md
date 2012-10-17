@@ -32,4 +32,5 @@ The following parameters are available on the Manager :-
 </table>
 
 
-Put the mongo-store jar and the mongo java driver (I've tested with 2.3) into the tomcat lib directory and you're good to go.
+Put the mongo-store jar and the mongo java driver into the tomcat lib directory and you're good to go.
+
