@@ -31,6 +31,8 @@ The following parameters are available on the Manager :-
 <tr><td>host</td><td>The database hostnames(s). Multiple hosts can be entered, seperated by a comma</td></tr>
 <tr><td>port</td><td>The database port to connect to. The same port will be used for each database host. The default is 27017</td></tr>
 <tr><td>database</td><td>The database used to store sessions in, the default is 'sessions'</td></tr>
+<tr><td>username</td><td>username for session database</td></tr>
+<tr><td>password</td><td>password for session database</td></tr>
 </table>
 
 
