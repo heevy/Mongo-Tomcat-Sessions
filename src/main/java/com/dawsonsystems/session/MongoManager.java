@@ -58,6 +58,8 @@ public class MongoManager extends LifecycleBase implements Manager {
   protected Mongo mongo;
   protected DB db;
   protected boolean slaveOk;
+  protected static String username;
+  protected static String password;
 
   private MongoSessionTrackerValve trackerValve;
   private ThreadLocal<StandardSession> currentSession = new ThreadLocal<StandardSession>();
@@ -288,6 +290,22 @@ public class MongoManager extends LifecycleBase implements Manager {
     MongoManager.database = database;
   }
 
+  public static String getUsername() {
+    return username;
+  }
+
+  public static void setUsername(String username) {
+    MongoManager.username = username;
+  }
+
+  public static String getPassword() {
+    return password;
+  }
+
+  public static void setPassword(String password) {
+    MongoManager.password = password;
+  }
+
   private DBCollection getCollection() throws IOException {
     return db.getCollection("sessions");
   }
@@ -454,13 +472,20 @@ public class MongoManager extends LifecycleBase implements Manager {
       }
       mongo = new Mongo(addrs);
       db = mongo.getDB(getDatabase());
+      authenticate();
       if (slaveOk) {
         db.setReadPreference(ReadPreference.secondaryPreferred());
       }
       getCollection().ensureIndex(new BasicDBObject("lastmodified", 1));
       log.info("Connected to Mongo " + host + "/" + database + " for session storage, slaveOk=" + slaveOk + ", " + (getMaxInactiveInterval() * 1000) + " session live time");
-    } catch (IOException e) {
+    } catch (Exception e) {
       throw new LifecycleException("Error Connecting to Mongo", e);
+    }
+  }
+  
+  private void authenticate() {
+    if (!db.authenticate(username, password.toCharArray())) {
+      throw new RuntimeException("Mongo authentication error");
     }
   }
 

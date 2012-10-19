@@ -17,7 +17,9 @@ Usage
 Add the following into your tomcat server.xml, or context.xml
 
     <Valve className="com.dawsonsystems.session.MongoSessionTrackerValve" />
-    <Manager className="com.dawsonsystems.session.MongoManager" host="dbHost1,dbHost2" port="27017" database="sessions" maxInactiveInterval="84"/>
+    <Manager className="com.dawsonsystems.session.MongoManager"
+	    host="dbHost1,dbHost2" port="27017" database="sessions" username="tomcat" password="tomcat"
+	    maxInactiveInterval="86400"/>
 
 The Valve must be before the Manager.
 
