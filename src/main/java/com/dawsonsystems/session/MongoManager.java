@@ -52,9 +52,9 @@ import com.mongodb.WriteResult;
 
 public class MongoManager extends LifecycleBase implements Manager {
     private static Logger log = Logger.getLogger("MongoManager");
-    protected static String host = "localhost";
-    protected static int port = 27017;
+    protected static String hosts = "localhost";
     protected static String database = "sessions";
+    private static final int DEFAULT_PORT = 27017;
     protected Mongo mongo;
     protected DB db;
     protected boolean slaveOk;
@@ -266,20 +266,12 @@ public class MongoManager extends LifecycleBase implements Manager {
         return loadSession(id);
     }
 
-    public static String getHost() {
-        return host;
+    public static String getHosts() {
+        return hosts;
     }
 
-    public static void setHost(String host) {
-        MongoManager.host = host;
-    }
-
-    public static int getPort() {
-        return port;
-    }
-
-    public static void setPort(int port) {
-        MongoManager.port = port;
+    public static void setHosts(String hosts) {
+        MongoManager.hosts = hosts;
     }
 
     public static String getDatabase() {
@@ -463,12 +455,22 @@ public class MongoManager extends LifecycleBase implements Manager {
 
     private void initDbConnection() throws LifecycleException {
         try {
-            String[] hosts = getHost().split(",");
+            String[] hosts = getHosts().split(",");
 
             List<ServerAddress> addrs = new ArrayList<ServerAddress>();
 
-            for (String host : hosts) {
-                addrs.add(new ServerAddress(host, getPort()));
+            for (String hostAddr : hosts) {
+                String host;
+                int port;
+                if(hostAddr.contains(":")){
+                    String[] parts = hostAddr.split(":");
+                    host=parts[0];
+                    port=Integer.parseInt(parts[1]);
+                }else{
+                    host=hostAddr;
+                    port=DEFAULT_PORT;
+                }
+                addrs.add(new ServerAddress(host, port));
             }
             mongo = new Mongo(addrs);
             db = mongo.getDB(getDatabase());
@@ -481,7 +483,7 @@ public class MongoManager extends LifecycleBase implements Manager {
                 db.setReadPreference(ReadPreference.secondaryPreferred());
             }
             getCollection().ensureIndex(new BasicDBObject("lastmodified", 1));
-            log.info("Connected to Mongo " + host + "/" + database + " for session storage, slaveOk=" + slaveOk + ", " + (getMaxInactiveInterval() * 1000) + " session live time");
+            log.info("Connected to Mongo " + getHosts() + "/" + database + " for session storage, slaveOk=" + slaveOk + ", " + (getMaxInactiveInterval() * 1000) + " session live time");
         } catch (Exception e) {
             throw new LifecycleException("Error Connecting to Mongo", e);
         }
